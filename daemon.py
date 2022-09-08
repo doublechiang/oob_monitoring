@@ -3,6 +3,7 @@
 from iscdhcpleases import Lease, IscDhcpLeases
 import time
 import logging
+import threading
 
 import uut
 
@@ -20,4 +21,6 @@ if __name__ == '__main__':
             if lease not in base.keys():
                 print("new lease found for {0}".format(lease))
                 u = uut.Uut(current.get(lease))
+                threading.Thread(target=u.startSol)
+
         base = current
