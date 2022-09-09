@@ -6,6 +6,7 @@ import os
 import time
 import datetime
 import tempfile
+import shutil
 
 from iscdhcpleases import Lease
 
@@ -17,13 +18,14 @@ class Uut:
 
     def startSol(self):
         if self.bmc_ip is None:
-            logging.info(f'UUT is not initialized by a validted IP address')
+            self.logger.info(f'UUT is not initialized by a validted IP address')
             return
 
         cmd = f"ipmitool -H {self.bmc_ip} -U {self.USERNAME} -P {self.USERPASS} -I lanplus sol activate"
         # self.sol_proc = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE, stderr=None, shell=False)
         fd, path = tempfile.mkstemp()
         with open(path, 'wb') as tempfp:
+            self.logger.debug(f"logging IP:{self.bmc_ip}, MBSN:{self.mbsn}")
             self.sol_proc = subprocess.Popen(cmd.split(), stdout=tempfp, stderr=None, shell=False)
             current_time = time.time()
             sol_endtime = current_time  + 60  # Target to capture 10 minutes.
@@ -33,14 +35,17 @@ class Uut:
 
             # Write the post code to end of file
             self.sol_proc.terminate()
-            cmd = f"ipmitool -H {self.bmc_ip} -U -U {self.USERNAME} -P {self.USERPASS} raw 0x32 0x73 0x0"
+            self.logger.debug(f"logging IP:{self.bmc_ip}, MBSN:{self.mbsn} stopped")
+
+            cmd = f"ipmitool -H {self.bmc_ip} -U {self.USERNAME} -P {self.USERPASS} raw 0x32 0x73 0x0"
             output = subprocess.run(cmd.split(), shell=False, stdout=subprocess.PIPE).stdout
-            tempfp.write(b'--------------------- POST code below ---------------------\n')
+            tempfp.write(b'\n--------------------- POST code below ---------------------\n')
             tempfp.write(output)
 
         date_str = datetime.datetime.now().strftime("%Y%m%d_%H%M")
         log_fn = f'OOB_LOG_{self.mbsn}_{date_str}.log'
-        os.rename(path, log_fn)
+        shutil.copyfile(path, log_fn)
+        os.unlink(path)
         return
    
 
@@ -70,12 +75,13 @@ class Uut:
                 if 'Board Serial' in line:
                     self.mbsn = line.split(':')[1].strip()
                     self.bmc_ip =  ip
+                    self.logger.debug(f"fru print get board serial number: {self.mbsn}, IP:{self.bmc_ip}")
                     continue
                 if 'Chassis Serial' in line:
                     self.csn = line.split(':')[1].strip()
                     continue
         except:
-            logging.error('OOB fru print command error')
+            self.logger.info(f'OOB fru print command error, ip:{ip} is possbile not bound to a BMC or credential is wrong')
 
 
     def __init_uut_from_lease(self, lease):
@@ -84,6 +90,7 @@ class Uut:
     def __init__(self, param=None):
         self.sol_proc = None
         self.bmc_ip = None
+        self.logger = logging.getLogger(__name__)
 
         if isinstance(param, Lease):
             vendor_str = param.sets.get('vendor-string')
@@ -98,7 +105,7 @@ class Uut:
 
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.INFO)
     Uut.USERNAME = 'root'
     Uut.USERPASS = 'db9b3748e18a'
     u = Uut('10.16.1.149')
