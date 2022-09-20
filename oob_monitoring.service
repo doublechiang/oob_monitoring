@@ -1,0 +1,16 @@
+[Unit]
+Description=oob_monitoring
+After=network.target
+
+[Service]
+User=cchiang
+Restart=always
+StartLimitBurst=0
+Environment=SYSTEMD_LOG_LEVEL=debug
+RestartSec=5
+WorkingDirectory=/home/cchiang/oob_monitoring
+ExecStart=/usr/bin/env python3 daemon.py
+TimeoutStopSec=3
+
+[Install]
+WantedBy=multi-user.target

@@ -9,6 +9,8 @@ import tempfile
 import shutil
 
 from iscdhcpleases import Lease
+from sfhand import Sfhand
+import settings
 
 
 class Uut:
@@ -28,7 +30,7 @@ class Uut:
             self.logger.debug(f"logging IP:{self.bmc_ip}, MBSN:{self.mbsn}")
             self.sol_proc = subprocess.Popen(cmd.split(), stdout=tempfp, stderr=None, shell=False)
             current_time = time.time()
-            sol_endtime = current_time  + 60  # Target to capture 10 minutes.
+            sol_endtime = current_time  + 60*10  # Target to capture 10 minutes.
 
             while time.time() < sol_endtime:
                 time.sleep(10)
@@ -43,9 +45,20 @@ class Uut:
             tempfp.write(output)
 
         date_str = datetime.datetime.now().strftime("%Y%m%d_%H%M")
-        log_fn = f'OOB_LOG_{self.mbsn}_{date_str}.log'
-        shutil.copyfile(path, log_fn)
-        os.unlink(path)
+
+        # We have MBSN, try to use sfhand to retrieve the CSN
+        log_fn = f'OOB_LOG_MBSN_{self.mbsn}_{date_str}.log'
+        if self.sfhand:
+            csn = self.sfhand.requestSfUutConfig(self.mbsn)
+            if csn:
+                log_fn = f'OOB_LOG_{csn}_{date_str}.log'
+
+        dest_path = settings.LOG_FOLDER + log_fn
+        try:
+            shutil.copyfile(path, dest_path)
+            os.unlink(path)
+        except:
+            logging.error(f'Unable to copy file to {dest_path}')
         return
    
 
@@ -91,6 +104,7 @@ class Uut:
         self.sol_proc = None
         self.bmc_ip = None
         self.logger = logging.getLogger(__name__)
+        self.sfhand = Sfhand()
 
         if isinstance(param, Lease):
             vendor_str = param.sets.get('vendor-string')
