@@ -20,14 +20,18 @@ class Uut:
 
     def startSol(self):
         if self.bmc_ip is None:
-            self.logger.info(f'UUT is not initialized by a validted IP address')
+            self.logger.debug(f'UUT is not initialized by a validated IP address')
             return
 
+        self.logger.info(f'UUT OOB Logging starting on IP:{self.bmc_ip},MBSN:{self.mbsn}')
         cmd = f"ipmitool -H {self.bmc_ip} -U {self.USERNAME} -P {self.USERPASS} -I lanplus sol activate"
         # self.sol_proc = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE, stderr=None, shell=False)
         fd, path = tempfile.mkstemp()
         with open(path, 'wb') as tempfp:
-            self.logger.debug(f"logging IP:{self.bmc_ip}, MBSN:{self.mbsn}")
+            log =f"logging BMC IP:{self.bmc_ip}, MBSN:{self.mbsn}" 
+            self.logger.debug(log)
+            tempfp.write(bytes(f"Sol Starting: {log}\n", 'utf-8'))
+            tempfp.flush()
             self.sol_proc = subprocess.Popen(cmd.split(), stdout=tempfp, stderr=None, shell=False)
             current_time = time.time()
             sol_endtime = current_time  + 60*10  # Target to capture 10 minutes.
@@ -36,6 +40,8 @@ class Uut:
                 time.sleep(10)
 
             # Write the post code to end of file
+            cmd = f"ipmitool -H {self.bmc_ip} -U {self.USERNAME} -P {self.USERPASS} -I lanplus sol deactivate"
+            os.system(cmd)
             self.sol_proc.terminate()
             self.logger.debug(f"logging IP:{self.bmc_ip}, MBSN:{self.mbsn} stopped")
 
@@ -44,22 +50,42 @@ class Uut:
             tempfp.write(b'\n--------------------- POST code below ---------------------\n')
             tempfp.write(output)
 
-        date_str = datetime.datetime.now().strftime("%Y%m%d_%H%M")
+            date_str = datetime.datetime.now().strftime("%Y%m%d_%H%M")
 
-        # We have MBSN, try to use sfhand to retrieve the CSN
-        log_fn = f'OOB_LOG_MBSN_{self.mbsn}_{date_str}.log'
-        if self.sfhand:
-            csn = self.sfhand.requestSfUutConfig(self.mbsn)
-            if csn:
-                log_fn = f'OOB_LOG_{csn}_{date_str}.log'
+            # We have MBSN, try to use sfhand to retrieve the CSN
+            log_fn = f'OOB_LOG_MBSN_{self.mbsn}_{date_str}.log'
+            if self.sfhand:
+                csn, error = self.sfhand.requestSfUutConfig(self.mbsn)
+                if csn:
+                    log_fn = f'OOB_LOG_{csn}_{date_str}.log'
+                else:
+                    tempfp.write(bytes(error, 'utf-8'))
+                
 
         dest_path = settings.LOG_FOLDER + log_fn
         try:
             shutil.copyfile(path, dest_path)
+            self.logger.info(f'OOB logger {dest_path} has been saved')
             os.unlink(path)
         except:
             logging.error(f'Unable to copy file to {dest_path}')
         return
+
+    def __parse_log(self, path):
+        with open(path, 'rb') as oobfp:
+            contents = oobfp.read()
+
+        error = ""
+        if b'ERROR: Boot option loading failed' in contents:
+            log = 'ERROR: Boot option loading failed'
+        if b'No Media Present' in contents:
+            log = 'No Media Present'
+        if b'No Bootable Device Detected' in contents:
+            log = 'No Bootable Device Detected'
+        if b'Traceback' in contents:
+            log = 'Diag Crashed.'
+
+        
    
 
 
@@ -108,6 +134,8 @@ class Uut:
 
         if isinstance(param, Lease):
             vendor_str = param.sets.get('vendor-string')
+            if vendor_str is None:
+                vendor_str=param.sets.get('vendor-class-identifier') 
             if vendor_str is not None:
                 if 'udhcp' in vendor_str:
                     self.__init_uut_from_lease(param)

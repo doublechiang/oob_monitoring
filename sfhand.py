@@ -12,6 +12,7 @@ class Sfhand:
     SF_FOLDER='/WIN/NetApp/'
     REQ_FOLDER= SF_FOLDER + 'Request/'
     RES_FOLDER = SF_FOLDER + 'Response/'
+    STS_FOLDER = SF_FOLDER + 'Status/'
 
     def __init__(self):
         pass
@@ -20,19 +21,39 @@ class Sfhand:
         """ Write a $MBSN.txt """
 
         qcisn = None
+        error = ''
         req_fn = f'{mbsn}.txt'
         with open(req_fn, 'w') as fp:
             fp.write(f'MBSN={mbsn}\n')
-            fp.write(f'IP=0.0.0.0\n')
             fp.write('Request=UUTconfig2\n')
 
         shutil.copyfile(req_fn, self.REQ_FOLDER + req_fn)
+        os.system(f'rm -f {req_fn}')
         if self.__wait_for(self.RES_FOLDER + req_fn):
             qcisn=self.__parse_qcisn(self.RES_FOLDER + req_fn)
-            os.unlink(self.RES_FOLDER + req_fn)
-            os.unlink(req_fn)
-        return qcisn
             
+            if qcisn == None:
+                error = 'QCISN not found in Response file\n'
+                error += '-----------------------------------\n'
+                with open(self.RES_FOLDER + req_fn, 'r') as response:
+                    error += response.read()
+                os.unlink(self.RES_FOLDER + req_fn)
+        else:
+            error = f'shopflow respone file {self.RES_FOLDER + req_fn} not found.'
+        return qcisn, error
+
+    def sendSfStatus(self, mbsn, msg):
+        qcisn = None
+        error = ''
+        req_fn = f'{mbsn}.txt'
+        with open(req_fn, 'w') as fp:
+            fp.write(f'MBSN={mbsn}\n')
+            fp.write(f'Station=FAT\n')
+            fp.write(f'Status=FAT test FAIL, {msg}')
+
+        shutil.copyfile(req_fn, self.STS_FOLDER + req_fn)
+        return 
+ 
         
 
     def __wait_for(self, fn, timeout=100):
@@ -56,5 +77,4 @@ class Sfhand:
 
 if __name__ == '__main__':
     sf=Sfhand()
-    qcisn=sf.requestSfUutConfig('B41222305059903A')
-    print(qcisn)
+    sf.sendSfStatus('B41222372021903A', 'retest=Y;FAT test FAIL, Ping BMC Management DHCP port FAIL===T6UB FAT test FAIL===')
