@@ -11,6 +11,8 @@ RestartSec=5
 WorkingDirectory=/home/cchiang/oob_monitoring
 ExecStart=/usr/bin/env python3 daemon.py
 TimeoutStopSec=3
+StandardOutput=tty
+StandardInput=tty
 
 [Install]
 WantedBy=multi-user.target
