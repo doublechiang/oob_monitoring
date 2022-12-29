@@ -60,7 +60,11 @@ class Uut:
                     log_fn = f'OOB_LOG_{csn}_{date_str}.log'
                 else:
                     tempfp.write(bytes(error, 'utf-8'))
-                
+        error = self.__parse_log(path)
+        if error is not None:
+            # send to SF status
+            if self.sfhand:
+                self.sfhand.sendSfStatus(self.mbsn, error)
 
         dest_path = settings.LOG_FOLDER + log_fn
         try:
@@ -75,18 +79,14 @@ class Uut:
         with open(path, 'rb') as oobfp:
             contents = oobfp.read()
 
-        error = ""
-        if b'ERROR: Boot option loading failed' in contents:
-            log = 'ERROR: Boot option loading failed'
+        error = None
         if b'No Media Present' in contents:
-            log = 'No Media Present'
+            error = 'No Media Present'
         if b'No Bootable Device Detected' in contents:
-            log = 'No Bootable Device Detected'
+            error = 'No Bootable Device Detected'
         if b'Traceback' in contents:
-            log = 'Diag Crashed.'
-
-        
-   
+            error = 'Diag program Crashed.'
+        return error
 
 
     def stopSol(self):

@@ -11,8 +11,8 @@ RestartSec=5
 WorkingDirectory=/home/cchiang/oob_monitoring
 ExecStart=/usr/bin/env python3 daemon.py
 TimeoutStopSec=3
-StandardOutput=tty
-StandardInput=tty
+StandardOutput=inherit
+StandardInput=tty-force
 
 [Install]
 WantedBy=multi-user.target

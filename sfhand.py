@@ -52,6 +52,7 @@ class Sfhand:
             fp.write(f'Status=FAT test FAIL, {msg}')
 
         shutil.copyfile(req_fn, self.STS_FOLDER + req_fn)
+        os.unlink(req_fn)
         return 
  
         
