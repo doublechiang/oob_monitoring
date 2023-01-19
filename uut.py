@@ -20,7 +20,7 @@ class Uut:
 
     def startSol(self):
         if self.bmc_ip is None:
-            self.logger.debug(f'UUT is not initialized by a validated IP address')
+            self.logger.debug('UUT is not initialized by a validated IP address')
             return
 
         self.logger.info(f'UUT OOB Logging starting on IP:{self.bmc_ip},MBSN:{self.mbsn}')
@@ -34,7 +34,7 @@ class Uut:
             tempfp.flush()
             self.sol_proc = subprocess.Popen(cmd.split(), stdout=tempfp, stderr=None, shell=False)
             current_time = time.time()
-            sol_endtime = current_time  + 60*10  # Target to capture 10 minutes.
+            sol_endtime = current_time  + 60*20  # Target to capture 20 minutes.
 
             while time.time() < sol_endtime:
                 time.sleep(10)
@@ -43,6 +43,7 @@ class Uut:
             cmd = f"ipmitool -H {self.bmc_ip} -U {self.USERNAME} -P {self.USERPASS} -I lanplus sol deactivate"
             os.system(cmd)
             self.sol_proc.terminate()
+            self.sol_proc.wait()
             self.logger.debug(f"logging IP:{self.bmc_ip}, MBSN:{self.mbsn} stopped")
 
             cmd = f"ipmitool -H {self.bmc_ip} -U {self.USERNAME} -P {self.USERPASS} raw 0x32 0x73 0x0"
@@ -55,9 +56,10 @@ class Uut:
             # We have MBSN, try to use sfhand to retrieve the CSN
             log_fn = f'OOB_LOG_MBSN_{self.mbsn}_{date_str}.log'
             if self.sfhand:
-                csn, error = self.sfhand.requestSfUutConfig(self.mbsn)
+                csn, error = self.sfhand.requestSfUutConfig(MBSN=self.mbsn)
                 if csn:
                     log_fn = f'OOB_LOG_{csn}_{date_str}.log'
+                    self.logger.info(f'IP:{self.bmc_ip}, MBSN:{self.mbsn}, CSN:{csn}')
                 else:
                     tempfp.write(bytes(error, 'utf-8'))
         error = self.__parse_log(path)
@@ -73,19 +75,25 @@ class Uut:
             os.unlink(path)
         except:
             logging.error(f'Unable to copy file to {dest_path}')
+
+        self.sol_proc.stdout.close()
+        del self.sol_proc
+
         return
 
     def __parse_log(self, path):
-        with open(path, 'rb') as oobfp:
+        with open(path, 'r') as oobfp:
             contents = oobfp.read()
 
         error = None
-        if b'No Media Present' in contents:
-            error = 'No Media Present'
-        if b'No Bootable Device Detected' in contents:
-            error = 'No Bootable Device Detected'
-        if b'Traceback' in contents:
-            error = 'Diag program Crashed.'
+        if 'No Media Present' in contents:
+            error = 'FAIL, No Media Present'
+        if 'No Bootable Device Detected' in contents:
+            error = 'FAIL, No Bootable Device Detected'
+        if 'Traceback' in contents:
+            error = 'ERROR, Diag program Crashed.'
+        if 'has no sf config' in contents:
+            error = 'ERROR, Cannot get SF config'
         return error
 
 
@@ -103,7 +111,6 @@ class Uut:
             # logging.error(f"errors:{errs}")
             # self.sol_proc.poll()
             # return output.decode('utf-8', 'ignore')
-
     def __init_uut_from_ipstr(self, ip):
         cmd = f'ipmitool -H {ip} -U {self.USERNAME} -P {self.USERPASS} fru print'
         self.csn = None

@@ -17,14 +17,20 @@ class Sfhand:
     def __init__(self):
         pass
 
-    def requestSfUutConfig(self, mbsn):
-        """ Write a $MBSN.txt """
+    def requestSfUutConfig(self, **kwargs):
+        """ Write a $MBSN.txt based request, MBSN is required parameter """
 
         qcisn = None
         error = ''
+        mbsn = kwargs.get('MBSN')
+        if mbsn is None:
+            error = 'MBSN is required'
+            return qcisn, error
+
         req_fn = f'{mbsn}.txt'
         with open(req_fn, 'w') as fp:
-            fp.write(f'MBSN={mbsn}\n')
+            for key, value in kwargs.items():
+                fp.write(f'{key}={value}\n')
             fp.write('Request=UUTconfig2\n')
 
         shutil.copyfile(req_fn, self.REQ_FOLDER + req_fn)
@@ -49,7 +55,7 @@ class Sfhand:
         with open(req_fn, 'w') as fp:
             fp.write(f'MBSN={mbsn}\n')
             fp.write(f'Station=FAT\n')
-            fp.write(f'Status=FAT test FAIL, {msg}')
+            fp.write(f'Status=FAT {msg}')
 
         shutil.copyfile(req_fn, self.STS_FOLDER + req_fn)
         os.unlink(req_fn)
