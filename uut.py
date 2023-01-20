@@ -20,7 +20,7 @@ class Uut:
 
     def startSol(self):
         if self.bmc_ip is None:
-            self.logger.debug('UUT is not initialized by a validated IP address')
+            logging.debug('UUT is not initialized by a validated IP address')
             return
 
         logging.info(f'UUT OOB Logging starting on IP:{self.bmc_ip},MBSN:{self.mbsn}')
@@ -36,15 +36,14 @@ class Uut:
         oob_logger.info(log)
         cmd = f"ipmitool -H {self.bmc_ip} -U {self.USERNAME} -P {self.USERPASS} -I lanplus sol activate"
         self.sol_proc = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE, stderr=None, shell=False)
-        current_time = time.time()
-        sol_endtime = current_time  + 360  # Target to capture in seconds
+        sol_endtime = time.time()  + 60*20  # Target to capture in seconds
 
         for line in iter(self.sol_proc.stdout.readline, b''):
             oob_logger.info(line.decode(errors='ignore').strip())
             if time.time() > sol_endtime:
                 cmd = f"ipmitool -H {self.bmc_ip} -U {self.USERNAME} -P {self.USERPASS} -I lanplus sol deactivate"
                 os.system(cmd)
-                logging.info(f"logging IP:{self.bmc_ip}, MBSN:{self.mbsn} stopped")
+                logging.info(f"deactivated sol logging IP:{self.bmc_ip}, MBSN:{self.mbsn}")
                 break
 
         # Write the post code to end of file
@@ -52,7 +51,7 @@ class Uut:
         self.sol_proc.kill()
 
         cmd = f"ipmitool -H {self.bmc_ip} -U {self.USERNAME} -P {self.USERPASS} raw 0x32 0x73 0x0"
-        output = subprocess.run(cmd.split(), shell=False, stdout=subprocess.PIPE, text=True).stdout
+        output = subprocess.run(cmd.split(), shell=False, stdout=subprocess.PIPE).stdout.decode(errors='ignore')
         sep = '\n--------------------- POST code below ---------------------\n'
         oob_logger.info(cmd + sep + output.strip())
         date_str = datetime.datetime.now().strftime("%Y%m%d_%H%M")
@@ -60,11 +59,11 @@ class Uut:
         # We have MBSN, try to use sfhand to retrieve the CSN
         log_fn = f'OOB_LOG_MBSN_{self.mbsn}_{date_str}.log'
         if self.sfhand:
-            csn, error = self.sfhand.requestSfUutConfig(self.mbsn)
+            csn, error = self.sfhand.requestSfUutConfig(MBSN=self.mbsn)
             if csn:
                 log_fn = f'OOB_LOG_{csn}_{date_str}.log'
             else:
-                oob_logger.error(bytes(error, 'utf-8'))
+                oob_logger.error(error)
 
         error = self.__parse_log(path)
         if error is not None:
@@ -78,7 +77,7 @@ class Uut:
             logging.info(f'OOB logger {dest_path} has been saved')
             os.unlink(path)
         except:
-            logging.error(f'Unable to copy file to {dest_path}')
+            logging.error(f'Unable to copy OOB log file to {dest_path}')
 
         return
 
