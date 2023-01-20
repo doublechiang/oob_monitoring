@@ -43,7 +43,8 @@ class Sfhand:
                 error += '-----------------------------------\n'
                 with open(self.RES_FOLDER + req_fn, 'r') as response:
                     error += response.read()
-                os.unlink(self.RES_FOLDER + req_fn)
+                # Per SF's request, do not remove the response folder
+                # os.unlink(self.RES_FOLDER + req_fn)
         else:
             error = f'shopflow respone file {self.RES_FOLDER + req_fn} not found.'
         return qcisn, error
