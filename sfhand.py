@@ -33,21 +33,26 @@ class Sfhand:
                 fp.write(f'{key}={value}\n')
             fp.write('Request=UUTconfig2\n')
 
-        shutil.copyfile(req_fn, self.REQ_FOLDER + req_fn)
-        os.system(f'rm -f {req_fn}')
-        if self.__wait_for(self.RES_FOLDER + req_fn):
-            qcisn=self.__parse_qcisn(self.RES_FOLDER + req_fn)
-            
-            if qcisn == None:
-                error = 'QCISN not found in Response file\n'
-                error += '-----------------------------------\n'
-                with open(self.RES_FOLDER + req_fn, 'r') as response:
-                    error += response.read()
-                # Per SF's request, do not remove the response folder
-                # os.unlink(self.RES_FOLDER + req_fn)
-        else:
-            error = f'shopflow respone file {self.RES_FOLDER + req_fn} not found.'
-        return qcisn, error
+        try:
+            shutil.copyfile(req_fn, self.REQ_FOLDER + req_fn)
+            os.system(f'rm -f {req_fn}')
+            if self.__wait_for(self.RES_FOLDER + req_fn):
+                qcisn=self.__parse_qcisn(self.RES_FOLDER + req_fn)
+                
+                if qcisn == None:
+                    error = 'QCISN not found in Response file\n'
+                    error += '-----------------------------------\n'
+                    with open(self.RES_FOLDER + req_fn, 'r') as response:
+                        error += response.read()
+                    # Per SF's request, do not remove the response folder
+                    # os.unlink(self.RES_FOLDER + req_fn)
+            else:
+                error = f'shopflow respone file {self.RES_FOLDER + req_fn} not found.'
+        except Exception as e:
+            logging.error(e)
+            error = e
+        finally:
+            return qcisn, error
 
     def sendSfStatus(self, mbsn, msg):
         qcisn = None
