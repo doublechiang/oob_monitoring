@@ -3,7 +3,7 @@ Description=oob_monitoring
 After=network.target
 
 [Service]
-User=cchiang
+User=root
 Restart=always
 StartLimitBurst=0
 Environment=SYSTEMD_LOG_LEVEL=debug

@@ -20,12 +20,11 @@ class Uut:
 
     def startSol(self):
         if self.bmc_ip is None:
-            self.logger.debug(f'UUT is not initialized by a validated IP address')
+            self.logger.debug('UUT is not initialized by a validated IP address')
             return
 
         logging.info(f'UUT OOB Logging starting on IP:{self.bmc_ip},MBSN:{self.mbsn}')
         fd, path = tempfile.mkstemp()
-
         # Setup logger using the tempfile
         handler= logging.FileHandler(path)
         handler.setFormatter(logging.Formatter('%(asctime)s %(message)s', "%Y-%m-%d %H:%M:%S"))
@@ -81,22 +80,21 @@ class Uut:
         except:
             logging.error(f'Unable to copy file to {dest_path}')
 
-
-        self.sol_proc.stdout.close()
-        del self.sol_proc
         return
 
     def __parse_log(self, path):
-        with open(path, 'rb') as oobfp:
+        with open(path, 'r') as oobfp:
             contents = oobfp.read()
 
         error = None
-        if b'No Media Present' in contents:
-            error = 'No Media Present'
-        if b'No Bootable Device Detected' in contents:
-            error = 'No Bootable Device Detected'
-        if b'Traceback' in contents:
-            error = 'Diag program Crashed.'
+        if 'No Media Present' in contents:
+            error = 'FAIL, No Media Present'
+        if 'No Bootable Device Detected' in contents:
+            error = 'FAIL, No Bootable Device Detected'
+        if 'Traceback' in contents:
+            error = 'ERROR, Diag program Crashed.'
+        if 'has no sf config' in contents:
+            error = 'ERROR, Cannot get SF config'
         return error
 
 
@@ -114,7 +112,6 @@ class Uut:
             # logging.error(f"errors:{errs}")
             # self.sol_proc.poll()
             # return output.decode('utf-8', 'ignore')
-
     def __init_uut_from_ipstr(self, ip):
         cmd = f'ipmitool -H {ip} -U {self.USERNAME} -P {self.USERPASS} fru print'
         self.csn = None
