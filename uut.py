@@ -23,43 +23,50 @@ class Uut:
             self.logger.debug(f'UUT is not initialized by a validated IP address')
             return
 
-        self.logger.info(f'UUT OOB Logging starting on IP:{self.bmc_ip},MBSN:{self.mbsn}')
-        cmd = f"ipmitool -H {self.bmc_ip} -U {self.USERNAME} -P {self.USERPASS} -I lanplus sol activate"
-        # self.sol_proc = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE, stderr=None, shell=False)
+        logging.info(f'UUT OOB Logging starting on IP:{self.bmc_ip},MBSN:{self.mbsn}')
         fd, path = tempfile.mkstemp()
-        with open(path, 'wb') as tempfp:
-            log =f"logging BMC IP:{self.bmc_ip}, MBSN:{self.mbsn}" 
-            self.logger.debug(log)
-            tempfp.write(bytes(f"Sol Starting: {log}\n", 'utf-8'))
-            tempfp.flush()
-            self.sol_proc = subprocess.Popen(cmd.split(), stdout=tempfp, stderr=None, shell=False)
-            current_time = time.time()
-            sol_endtime = current_time  + 60*10  # Target to capture 10 minutes.
 
-            while time.time() < sol_endtime:
-                time.sleep(10)
+        # Setup logger using the tempfile
+        handler= logging.FileHandler(path)
+        handler.setFormatter(logging.Formatter('%(asctime)s %(message)s', "%Y-%m-%d %H:%M:%S"))
+        oob_logger = logging.getLogger(self.mbsn)
+        oob_logger.setLevel(logging.INFO)
+        oob_logger.addHandler(handler)
 
-            # Write the post code to end of file
-            cmd = f"ipmitool -H {self.bmc_ip} -U {self.USERNAME} -P {self.USERPASS} -I lanplus sol deactivate"
-            os.system(cmd)
-            self.sol_proc.terminate()
-            self.logger.debug(f"logging IP:{self.bmc_ip}, MBSN:{self.mbsn} stopped")
+        log =f"start logging BMC IP:{self.bmc_ip}, MBSN:{self.mbsn}" 
+        oob_logger.info(log)
+        cmd = f"ipmitool -H {self.bmc_ip} -U {self.USERNAME} -P {self.USERPASS} -I lanplus sol activate"
+        self.sol_proc = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE, stderr=None, shell=False)
+        current_time = time.time()
+        sol_endtime = current_time  + 360  # Target to capture in seconds
 
-            cmd = f"ipmitool -H {self.bmc_ip} -U {self.USERNAME} -P {self.USERPASS} raw 0x32 0x73 0x0"
-            output = subprocess.run(cmd.split(), shell=False, stdout=subprocess.PIPE).stdout
-            tempfp.write(b'\n--------------------- POST code below ---------------------\n')
-            tempfp.write(output)
+        for line in iter(self.sol_proc.stdout.readline, b''):
+            oob_logger.info(line.decode(errors='ignore').strip())
+            if time.time() > sol_endtime:
+                cmd = f"ipmitool -H {self.bmc_ip} -U {self.USERNAME} -P {self.USERPASS} -I lanplus sol deactivate"
+                os.system(cmd)
+                logging.info(f"logging IP:{self.bmc_ip}, MBSN:{self.mbsn} stopped")
+                break
 
-            date_str = datetime.datetime.now().strftime("%Y%m%d_%H%M")
+        # Write the post code to end of file
+        self.sol_proc.terminate()
+        self.sol_proc.kill()
 
-            # We have MBSN, try to use sfhand to retrieve the CSN
-            log_fn = f'OOB_LOG_MBSN_{self.mbsn}_{date_str}.log'
-            if self.sfhand:
-                csn, error = self.sfhand.requestSfUutConfig(self.mbsn)
-                if csn:
-                    log_fn = f'OOB_LOG_{csn}_{date_str}.log'
-                else:
-                    tempfp.write(bytes(error, 'utf-8'))
+        cmd = f"ipmitool -H {self.bmc_ip} -U {self.USERNAME} -P {self.USERPASS} raw 0x32 0x73 0x0"
+        output = subprocess.run(cmd.split(), shell=False, stdout=subprocess.PIPE, text=True).stdout
+        sep = '\n--------------------- POST code below ---------------------\n'
+        oob_logger.info(cmd + sep + output.strip())
+        date_str = datetime.datetime.now().strftime("%Y%m%d_%H%M")
+
+        # We have MBSN, try to use sfhand to retrieve the CSN
+        log_fn = f'OOB_LOG_MBSN_{self.mbsn}_{date_str}.log'
+        if self.sfhand:
+            csn, error = self.sfhand.requestSfUutConfig(self.mbsn)
+            if csn:
+                log_fn = f'OOB_LOG_{csn}_{date_str}.log'
+            else:
+                oob_logger.error(bytes(error, 'utf-8'))
+
         error = self.__parse_log(path)
         if error is not None:
             # send to SF status
@@ -69,10 +76,14 @@ class Uut:
         dest_path = settings.LOG_FOLDER + log_fn
         try:
             shutil.copyfile(path, dest_path)
-            self.logger.info(f'OOB logger {dest_path} has been saved')
+            logging.info(f'OOB logger {dest_path} has been saved')
             os.unlink(path)
         except:
             logging.error(f'Unable to copy file to {dest_path}')
+
+
+        self.sol_proc.stdout.close()
+        del self.sol_proc
         return
 
     def __parse_log(self, path):
@@ -119,8 +130,9 @@ class Uut:
                 if 'Chassis Serial' in line:
                     self.csn = line.split(':')[1].strip()
                     continue
-        except:
-            self.logger.info(f'OOB fru print command error, ip:{ip} is possbile not bound to a BMC or credential is wrong')
+        except Exception as e:
+            logging.error(e)
+            logging.error(f'OOB fru print command error, ip:{ip} is possbile not bound to a BMC or credential is wrong')
 
 
     def __init_uut_from_lease(self, lease):
@@ -129,7 +141,6 @@ class Uut:
     def __init__(self, param=None):
         self.sol_proc = None
         self.bmc_ip = None
-        self.logger = logging.getLogger(__name__)
         self.sfhand = Sfhand()
 
         if isinstance(param, Lease):
