@@ -39,21 +39,38 @@ class Uut:
         sol_endtime = time.time()  + 60*20  # Target to capture in seconds
 
         for line in iter(self.sol_proc.stdout.readline, b''):
-            oob_logger.info(line.decode(errors='ignore').strip())
+            if line:
+                oob_logger.info(line.decode(errors='ignore').strip())
             if time.time() > sol_endtime:
                 cmd = f"ipmitool -H {self.bmc_ip} -U {self.USERNAME} -P {self.USERPASS} -I lanplus sol deactivate"
                 os.system(cmd)
-                logging.info(f"deactivated sol logging IP:{self.bmc_ip}, MBSN:{self.mbsn}")
+                self.sol_proc.kill()
+                outs,errs = self.sol_proc.communicate(b'~.', timeout=5)
+                self.sol_proc.stdout.close()
+                del self.sol_proc
                 break
 
-        # Write the post code to end of file
-        self.sol_proc.terminate()
-        self.sol_proc.kill()
+#        Below method works, however, little chances that line will broken several lines
+#        os.set_blocking(self.sol_proc.stdout.fileno(), False)           # set non block for readline
+#        while time.time() < sol_endtime:
+#            line = self.sol_proc.stdout.readline()
+#            if line:
+#                oob_logger.info(line.decode(errors='ignore').strip())
+#            time.sleep(0.1)
 
+#        cmd = f"ipmitool -H {self.bmc_ip} -U {self.USERNAME} -P {self.USERPASS} -I lanplus sol deactivate"
+#        os.system(cmd)
+#        outs,errs = self.sol_proc.communicate(b'~.', timeout=5)
+#        self.sol_proc.stdout.close()
+#        del self.sol_proc
+
+        logging.info(f"deactivated sol logging IP:{self.bmc_ip}, MBSN:{self.mbsn}")
+
+        # Write the post code to end of file
         cmd = f"ipmitool -H {self.bmc_ip} -U {self.USERNAME} -P {self.USERPASS} raw 0x32 0x73 0x0"
         output = subprocess.run(cmd.split(), shell=False, stdout=subprocess.PIPE).stdout.decode(errors='ignore')
         sep = '\n--------------------- POST code below ---------------------\n'
-        oob_logger.info(cmd + sep + output.strip())
+        oob_logger.info(cmd + sep + output.rstrip())
         date_str = datetime.datetime.now().strftime("%Y%m%d_%H%M")
 
         # We have MBSN, try to use sfhand to retrieve the CSN
