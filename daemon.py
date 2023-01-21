@@ -12,10 +12,15 @@ import uut
 if __name__ == '__main__':
     LEASE_FILE = '/var/lib/dhcpd/dhcpd.leases'
     LOG_FILE = '/var/log/oob_monitoring.log'
-    logging.basicConfig(filename=LOG_FILE, format='%(asctime)s - %(message)s', level=logging.DEBUG)
+    # logging.basicConfig(filename=LOG_FILE, format='%(asctime)s - %(message)s', level=logging.DEBUG)
+    logging.basicConfig(level=logging.DEBUG)
     leases = IscDhcpLeases(LEASE_FILE)
     base = leases.get_current()
-    logger = logging.getLogger(__name__)
+    app_log_handler= logging.FileHandler(LOG_FILE)
+    app_log_handler.setFormatter(logging.Formatter('%(asctime)s %(message)s', "%Y-%m-%d %H:%M:%S"))
+    logger = logging.getLogger('app')
+    logger.setLevel(logging.DEBUG)
+    logger.addHandler(app_log_handler)
 
     while True:
         time.sleep(60)

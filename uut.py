@@ -21,10 +21,10 @@ class Uut:
 
     def startSol(self):
         if self.bmc_ip is None:
-            logging.debug('UUT is not initialized by a validated IP address')
+            self.app_logger.debug('UUT is not initialized by a validated IP address')
             return
 
-        logging.info(f'UUT OOB Logging starting on IP:{self.bmc_ip},MBSN:{self.mbsn}')
+        self.app_logger.info(f'UUT OOB Logging starting on IP:{self.bmc_ip},MBSN:{self.mbsn}')
         fd, path = tempfile.mkstemp()
         # Setup logger using the tempfile
         handler= logging.FileHandler(path)
@@ -65,7 +65,7 @@ class Uut:
         self.sol_proc.stdout.close()
         del self.sol_proc
 
-        logging.info(f"deactivated sol logging IP:{self.bmc_ip}, MBSN:{self.mbsn}")
+        self.app_logger.debug(f"deactivated sol logging IP:{self.bmc_ip}, MBSN:{self.mbsn}")
 
         # Write the post code to end of file
         cmd = f"ipmitool -H {self.bmc_ip} -U {self.USERNAME} -P {self.USERPASS} raw 0x32 0x73 0x0"
@@ -94,10 +94,10 @@ class Uut:
         dest_path = settings.LOG_FOLDER + log_fn
         try:
             shutil.copyfile(path, dest_path)
-            logging.info(f'OOB logger {dest_path} has been saved')
+            self.app_logger.info(f'OOB logger {dest_path} has been saved')
             os.unlink(path)
         except:
-            logging.error(f'Unable to copy OOB log file to {dest_path}')
+            self.app_logger.error(f'Unable to copy OOB log file to {dest_path}')
 
         return
 
@@ -147,8 +147,8 @@ class Uut:
                     self.csn = line.split(':')[1].strip()
                     continue
         except Exception as e:
-            logging.error(e)
-            logging.error(f'OOB fru print command error, ip:{ip} is possbile not bound to a BMC or credential is wrong')
+            self.app_logger.error(e)
+            self.app_logger.error(f'OOB fru print command error, ip:{ip} is possbile not bound to a BMC or credential is wrong')
 
 
     def __init_uut_from_lease(self, lease):
@@ -158,6 +158,7 @@ class Uut:
         self.sol_proc = None
         self.bmc_ip = None
         self.sfhand = Sfhand()
+        self.app_logger = logging.getLogger('app')
 
         if isinstance(param, Lease):
             vendor_str = param.sets.get('vendor-string')
