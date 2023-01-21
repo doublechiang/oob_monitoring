@@ -17,6 +17,7 @@ class Uut:
 
     USERNAME = 'admin'
     USERPASS = 'admin'
+    LOGGING_DURATION_SECS= 60*20
 
     def startSol(self):
         if self.bmc_ip is None:
@@ -35,34 +36,34 @@ class Uut:
         log =f"start logging BMC IP:{self.bmc_ip}, MBSN:{self.mbsn}" 
         oob_logger.info(log)
         cmd = f"ipmitool -H {self.bmc_ip} -U {self.USERNAME} -P {self.USERPASS} -I lanplus sol activate"
-        self.sol_proc = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE, stderr=None, shell=False)
-        sol_endtime = time.time()  + 60*20  # Target to capture in seconds
+        self.sol_proc = subprocess.Popen(cmd.split(), stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=None, shell=False)
+        sol_endtime = time.time()  + self.LOGGING_DURATION_SECS  # Target to capture in seconds
 
-        for line in iter(self.sol_proc.stdout.readline, b''):
-            if line:
-                oob_logger.info(line.decode(errors='ignore').strip())
-            if time.time() > sol_endtime:
-                cmd = f"ipmitool -H {self.bmc_ip} -U {self.USERNAME} -P {self.USERPASS} -I lanplus sol deactivate"
-                os.system(cmd)
-                self.sol_proc.kill()
-                outs,errs = self.sol_proc.communicate(b'~.', timeout=5)
-                self.sol_proc.stdout.close()
-                del self.sol_proc
-                break
-
-#        Below method works, however, little chances that line will broken several lines
-#        os.set_blocking(self.sol_proc.stdout.fileno(), False)           # set non block for readline
-#        while time.time() < sol_endtime:
-#            line = self.sol_proc.stdout.readline()
+#        if there is no output, stdout, this iter object will block call
+#        for line in iter(self.sol_proc.stdout.readline, b''):
 #            if line:
 #                oob_logger.info(line.decode(errors='ignore').strip())
-#            time.sleep(0.1)
+#            if time.time() > sol_endtime:
+#                cmd = f"ipmitool -H {self.bmc_ip} -U {self.USERNAME} -P {self.USERPASS} -I lanplus sol deactivate"
+#                os.system(cmd)
+#                self.sol_proc.kill()
+#                outs,errs = self.sol_proc.communicate(b'~.', timeout=5)
+#                self.sol_proc.stdout.close()
+#                del self.sol_proc
+#                break
 
-#        cmd = f"ipmitool -H {self.bmc_ip} -U {self.USERNAME} -P {self.USERPASS} -I lanplus sol deactivate"
-#        os.system(cmd)
-#        outs,errs = self.sol_proc.communicate(b'~.', timeout=5)
-#        self.sol_proc.stdout.close()
-#        del self.sol_proc
+        os.set_blocking(self.sol_proc.stdout.fileno(), False)           # set non block for readline
+        while time.time() < sol_endtime:
+            line = self.sol_proc.stdout.readline()
+            if line:
+                oob_logger.info(line.decode(errors='ignore').strip())
+            time.sleep(0.1)
+
+        cmd = f"ipmitool -H {self.bmc_ip} -U {self.USERNAME} -P {self.USERPASS} -I lanplus sol deactivate"
+        os.system(cmd)
+        outs,errs = self.sol_proc.communicate(b'~.', timeout=5)
+        self.sol_proc.stdout.close()
+        del self.sol_proc
 
         logging.info(f"deactivated sol logging IP:{self.bmc_ip}, MBSN:{self.mbsn}")
 
@@ -82,6 +83,8 @@ class Uut:
             else:
                 oob_logger.error(error)
 
+        oob_logger.flush()
+        oob_logger.close()
         error = self.__parse_log(path)
         if error is not None:
             # send to SF status
