@@ -141,7 +141,7 @@ class Uut:
                 if 'Board Serial' in line:
                     self.mbsn = line.split(':')[1].strip()
                     self.bmc_ip =  ip
-                    self.logger.debug(f"fru print get board serial number: {self.mbsn}, IP:{self.bmc_ip}")
+                    self.app_logger.debug(f"fru print get board serial number: {self.mbsn}, IP:{self.bmc_ip}")
                     continue
                 if 'Chassis Serial' in line:
                     self.csn = line.split(':')[1].strip()
