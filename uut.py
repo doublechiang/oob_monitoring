@@ -83,8 +83,6 @@ class Uut:
             else:
                 oob_logger.error(error)
 
-        oob_logger.flush()
-        oob_logger.close()
         error = self.__parse_log(path)
         if error is not None:
             # send to SF status
@@ -93,6 +91,8 @@ class Uut:
 
         dest_path = settings.LOG_FOLDER + log_fn
         try:
+            handler.flush()
+            handler.close()
             shutil.copyfile(path, dest_path)
             self.app_logger.info(f'OOB logger {dest_path} has been saved')
             os.unlink(path)
