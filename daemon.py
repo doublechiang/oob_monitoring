@@ -22,6 +22,7 @@ if __name__ == '__main__':
     logger.setLevel(logging.DEBUG)
     logger.addHandler(app_log_handler)
 
+    thread_pool = list()
     while True:
         time.sleep(60)
         gc.collect()
@@ -31,6 +32,14 @@ if __name__ == '__main__':
             if lease not in base.keys():
                 logger.debug("new lease found for {0}".format(lease))
                 u = uut.Uut(current.get(lease))
-                threading.Thread(target=u.startSol).start()
+                t = threading.Thread(target=u.startSol)
+                t.start()
+                thread_pool.append((t, u))
 
         base = current
+
+        # clean up thread and uut objects from the duplicate list
+        for t, u  in list(thread_pool):
+            if not t.is_alive():
+                del u
+                thread_pool.remove((t, u))

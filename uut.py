@@ -89,10 +89,11 @@ class Uut:
             if self.sfhand:
                 self.sfhand.sendSfStatus(self.mbsn, error)
 
+        handler.flush()
+        handler.close()
+
         dest_path = settings.LOG_FOLDER + log_fn
         try:
-            handler.flush()
-            handler.close()
             shutil.copyfile(path, dest_path)
             self.app_logger.info(f'OOB logger {dest_path} has been saved')
             os.unlink(path)
