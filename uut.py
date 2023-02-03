@@ -17,7 +17,7 @@ class Uut:
 
     USERNAME = 'admin'
     USERPASS = 'admin'
-    LOGGING_DURATION_SECS= 60*20
+    LOGGING_DURATION_SECS= 60*25
 
     def startSol(self):
         if self.bmc_ip is None:
@@ -77,7 +77,8 @@ class Uut:
         # We have MBSN, try to use sfhand to retrieve the CSN
         log_fn = f'OOB_LOG_MBSN_{self.mbsn}_{date_str}.log'
         if self.sfhand:
-            csn, error = self.sfhand.requestSfUutConfig(MBSN=self.mbsn)
+            # IP field is not required. Requested by ITE team since they suspect the missing IP field, can be removed without issue.
+            csn, error = self.sfhand.requestSfUutConfig(MBSN=self.mbsn, IP='0.0.0.0')
             if csn:
                 log_fn = f'OOB_LOG_{csn}_{date_str}.log'
             else:
