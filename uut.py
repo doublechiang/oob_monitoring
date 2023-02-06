@@ -38,25 +38,24 @@ class Uut:
         cmd = f"ipmitool -H {self.bmc_ip} -U {self.USERNAME} -P {self.USERPASS} -I lanplus sol activate"
 
         #Time Duration based on Product Name ---------
-        cmdFruPrint = f"ipmitool -H {self.bmc_ip} -U {self.USERNAME} -P {self.USERPASS} -I lanplus fru print"
-        fruPrint  = (((subprocess.run(cmdFruPrint.split(), stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=None, shell=False)).stdout.decode('utf-8')).split('\n'))
-        specs = {}
+        cmdForFruPrint = f"ipmitool -H {self.bmc_ip} -U {self.USERNAME} -P {self.USERPASS} -I lanplus fru print"
+        fruPrint  = (((subprocess.run(cmdForFruPrint.split(), stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=None, shell=False)).stdout.decode('utf-8')).split('\n'))
+        fru = {}
         for line in fruPrint:
             data = line.split(':')
             try:
-                specs[data[0].strip()] = data[1].strip()
+                fru[data[0].strip()] = data[1].strip()
             except Exception as e:
                 self.app_logger.error(e)
-        productName = specs['Product Name']
+        productName = fru['Product Name']
         if (productName in self.PRODUCT_DURATION):
             logging_durations_secs = self.PRODUCT_DURATION[productName]
         else:
             logging_durations_secs = self.PRODUCT_DURATION['Default'] 
-        print (logging_durations_secs)    
+        # print (logging_durations_secs)    
         
         self.sol_proc = subprocess.Popen(cmd.split(), stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=None, shell=False)
   
-        
         sol_endtime = time.time()  + logging_durations_secs  # Target to capture in seconds
 
 #        if there is no output, stdout, this iter object will block call
