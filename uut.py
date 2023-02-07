@@ -38,7 +38,7 @@ class Uut:
         oob_logger.info(log)
         cmd = f"ipmitool -H {self.bmc_ip} -U {self.USERNAME} -P {self.USERPASS} -I lanplus sol activate"
 
-        
+               
         if (self.product_name in self.PRODUCT_DURATION):
             logging_durations_secs = self.PRODUCT_DURATION[self.product_name]
         else:
@@ -172,6 +172,7 @@ class Uut:
     def __init__(self, param=None):
         self.sol_proc = None
         self.bmc_ip = None
+        self.product_name = None
         self.sfhand = Sfhand()
         self.app_logger = logging.getLogger('app')
 
