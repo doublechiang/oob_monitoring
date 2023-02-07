@@ -20,6 +20,7 @@ class Uut:
     PRODUCT_DURATION = settings.PRODUCT_DURATIONS
 
     def startSol(self):
+        
         if self.bmc_ip is None:
             self.app_logger.debug('UUT is not initialized by a validated IP address')
             return
@@ -37,25 +38,15 @@ class Uut:
         oob_logger.info(log)
         cmd = f"ipmitool -H {self.bmc_ip} -U {self.USERNAME} -P {self.USERPASS} -I lanplus sol activate"
 
-        #Time Duration based on Product Name ---------
-        cmdForFruPrint = f"ipmitool -H {self.bmc_ip} -U {self.USERNAME} -P {self.USERPASS} -I lanplus fru print"
-        fruPrint  = (((subprocess.run(cmdForFruPrint.split(), stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=None, shell=False)).stdout.decode('utf-8')).split('\n'))
-        fru = {}
-        for line in fruPrint:
-            data = line.split(':')
-            try:
-                fru[data[0].strip()] = data[1].strip()
-            except Exception as e:
-                self.app_logger.error(e)
-        productName = fru['Product Name']
-        if (productName in self.PRODUCT_DURATION):
-            logging_durations_secs = self.PRODUCT_DURATION[productName]
+        
+        if (self.product_name in self.PRODUCT_DURATION):
+            logging_durations_secs = self.PRODUCT_DURATION[self.product_name]
         else:
             logging_durations_secs = self.PRODUCT_DURATION['Default'] 
         # print (logging_durations_secs)    
         
         self.sol_proc = subprocess.Popen(cmd.split(), stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=None, shell=False)
-  
+
         sol_endtime = time.time()  + logging_durations_secs  # Target to capture in seconds
 
 #        if there is no output, stdout, this iter object will block call
@@ -166,6 +157,9 @@ class Uut:
                     continue
                 if 'Chassis Serial' in line:
                     self.csn = line.split(':')[1].strip()
+                    continue
+                if 'Product Name' in line:
+                    self.product_name = line.split(':')[1].strip()
                     continue
         except Exception as e:
             self.app_logger.error(e)
